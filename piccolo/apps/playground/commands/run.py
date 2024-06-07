@@ -5,7 +5,6 @@ for interacting with the data using Piccolo.
 
 import datetime
 import sys
-import typing as t
 import uuid
 from decimal import Decimal
 from enum import Enum
@@ -14,10 +13,12 @@ from piccolo.columns import (
     JSON,
     UUID,
     Boolean,
+    Date,
     ForeignKey,
     Integer,
     Interval,
     Numeric,
+    Serial,
     Timestamp,
     Varchar,
 )
@@ -29,6 +30,7 @@ from piccolo.utils.warnings import colored_string
 
 
 class Manager(Table):
+    id: Serial
     name = Varchar(length=50)
 
     @classmethod
@@ -40,6 +42,7 @@ class Manager(Table):
 
 
 class Band(Table):
+    id: Serial
     name = Varchar(length=50)
     manager = ForeignKey(references=Manager, null=True)
     popularity = Integer()
@@ -53,6 +56,7 @@ class Band(Table):
 
 
 class Venue(Table):
+    id: Serial
     name = Varchar(length=100)
     capacity = Integer(default=0)
 
@@ -65,6 +69,7 @@ class Venue(Table):
 
 
 class Concert(Table):
+    id: Serial
     band_1 = ForeignKey(Band)
     band_2 = ForeignKey(Band)
     venue = ForeignKey(Venue)
@@ -89,6 +94,7 @@ class Ticket(Table):
         standing = "standing"
         premium = "premium"
 
+    id: Serial
     concert = ForeignKey(Concert)
     price = Numeric(digits=(5, 2))
     ticket_type = Varchar(choices=TicketType, default=TicketType.standing)
@@ -98,13 +104,14 @@ class Ticket(Table):
         return Readable(
             template="%s - %s",
             columns=[
-                t.cast(t.Type[Venue], cls.concert.venue).name,
+                cls.concert._.venue._.name,
                 cls.ticket_type,
             ],
         )
 
 
 class DiscountCode(Table):
+    id: Serial
     code = UUID()
     active = Boolean(default=True, null=True)
 
@@ -117,6 +124,7 @@ class DiscountCode(Table):
 
 
 class RecordingStudio(Table):
+    id: Serial
     name = Varchar(length=100)
     facilities = JSON(null=True)
 
@@ -128,7 +136,31 @@ class RecordingStudio(Table):
         )
 
 
-TABLES = (Manager, Band, Venue, Concert, Ticket, DiscountCode, RecordingStudio)
+class Album(Table):
+    id: Serial
+    name = Varchar()
+    band = ForeignKey(Band)
+    release_date = Date()
+    recorded_at = ForeignKey(RecordingStudio)
+
+    @classmethod
+    def get_readable(cls) -> Readable:
+        return Readable(
+            template="%s - %s",
+            columns=[cls.name, cls.band._.name],
+        )
+
+
+TABLES = (
+    Manager,
+    Band,
+    Venue,
+    Concert,
+    Ticket,
+    DiscountCode,
+    RecordingStudio,
+    Album,
+)
 
 
 def populate():
@@ -184,24 +216,44 @@ def populate():
         *[DiscountCode({DiscountCode.code: uuid.uuid4()}) for _ in range(5)]
     ).run_sync()
 
-    RecordingStudio.insert(
-        RecordingStudio(
+    recording_studio_1 = RecordingStudio(
+        {
+            RecordingStudio.name: "Abbey Road",
+            RecordingStudio.facilities: {
+                "restaurant": True,
+                "mixing_desk": True,
+            },
+        }
+    )
+    recording_studio_1.save().run_sync()
+
+    recording_studio_2 = RecordingStudio(
+        {
+            RecordingStudio.name: "Electric Lady",
+            RecordingStudio.facilities: {
+                "restaurant": False,
+                "mixing_desk": True,
+            },
+        },
+    )
+    recording_studio_2.save().run_sync()
+
+    Album.insert(
+        Album(
             {
-                RecordingStudio.name: "Abbey Road",
-                RecordingStudio.facilities: {
-                    "restaurant": True,
-                    "mixing_desk": True,
-                },
+                Album.name: "Awesome album 1",
+                Album.recorded_at: recording_studio_1,
+                Album.band: pythonistas,
+                Album.release_date: datetime.date(year=2021, month=1, day=1),
             }
         ),
-        RecordingStudio(
+        Album(
             {
-                RecordingStudio.name: "Electric Lady",
-                RecordingStudio.facilities: {
-                    "restaurant": False,
-                    "mixing_desk": True,
-                },
-            },
+                Album.name: "Awesome album 2",
+                Album.recorded_at: recording_studio_2,
+                Album.band: rustaceans,
+                Album.release_date: datetime.date(year=2022, month=2, day=2),
+            }
         ),
     ).run_sync()
 
@@ -278,7 +330,7 @@ def run(
 
     populate()
 
-    from IPython.core.interactiveshell import _asyncio_runner
+    from IPython.core.async_helpers import _asyncio_runner
 
     if ipython_profile:
         print(colored_string("Using your IPython profile\n"))

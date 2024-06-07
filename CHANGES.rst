@@ -1,6 +1,66 @@
 Changes
 =======
 
+1.7.0
+-----
+
+Arrays of ``Date`` / ``Time`` / ``Timestamp`` / ``Timestamptz`` now work in
+SQLite.
+
+For example:
+
+.. code-block:: python
+
+  class MyTable(Table):
+      times = Array(Time())
+      dates = Array(Date())
+      timestamps = Array(Timestamp())
+      timestamps_tz = Array(Timestamptz())
+
+-------------------------------------------------------------------------------
+
+1.6.0
+-----
+
+Added support for a bunch of Postgres functions, like ``Upper``, ``Lower``,
+``Length``, and ``Ltrim``. They can be used in ``select`` queries:
+
+.. code-block:: python
+
+  from piccolo.query.functions.string import Upper
+  >>> await Band.select(Upper(Band.name, alias="name"))
+  [{"name": "PYTHONISTAS"}]
+
+And also in ``where`` clauses:
+
+.. code-block:: python
+
+  >>> await Band.select().where(Upper(Band.manager.name) == 'GUIDO')
+  [{"name": "Pythonistas"}]
+
+-------------------------------------------------------------------------------
+
+1.5.2
+-----
+
+Added an ``Album`` table to the playground, along with some other
+improvements.
+
+Fixed a bug with the ``output(load_json=True)`` clause, when used on joined
+tables.
+
+-------------------------------------------------------------------------------
+
+1.5.1
+-----
+
+Fixed a bug with the CLI when reversing migrations (thanks to @metakot for
+reporting this).
+
+Updated the ASGI templates (thanks to @tarsil for adding Lilya).
+
+-------------------------------------------------------------------------------
+
 1.5.0
 -----
 
